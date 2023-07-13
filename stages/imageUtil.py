@@ -1,14 +1,7 @@
 import numpy as np
 import cv2 as cv
 from .types import *
-
-def ApplyToLayer(index: int, app_stage: Callable[[_LayerStage], _LayerStage]):
-    def stage(prev_stage: _ImageStage) -> _ImageStage:
-        setLayer = SetLayer(index)
-        getLayer = GetLayer(index)
-        return setLayer(prev_stage, app_stage(getLayer(prev_stage)))
-    return stage
-
+from .util import Cache, PostEffect
 
 def BGR2HLS():
     def stage(prev_stage: _ImageStage) -> _ImageStage:
@@ -43,9 +36,19 @@ def SetLayer(index: int):
         def set_layer() -> _Image:
             image = prev_stage()
             layer = layer_stage()
-            assert isinstance(image, np.ndarray)
-            assert isinstance(layer, np.ndarray)
             image[:, :, index] = layer
             return image
         return set_layer
+    return stage
+
+
+def ApplyToLayer(index: int, app_stage: Callable[[_LayerStage], _LayerStage]):
+    def stage(prev_stage: _ImageStage) -> _ImageStage:
+        setLayer = SetLayer(index)
+        getLayer = GetLayer(index)
+        cache, clear = Cache()
+        s = cache(prev_stage)
+        s = setLayer(s, app_stage(getLayer(s)))
+        s = PostEffect(clear)(s)
+        return s
     return stage
